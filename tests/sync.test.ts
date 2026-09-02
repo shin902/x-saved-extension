@@ -21,7 +21,7 @@ const chromeMock = {
 describe('outbox sync protocol', () => {
   const outbox = new Outbox();
   afterEach(async () => {
-    await outbox.remove((await outbox.list(100)).map((record) => record.dedupe_key));
+    await outbox.clear();
     for (const key of Object.keys(stored)) delete stored[key];
     vi.unstubAllGlobals();
   });
@@ -46,5 +46,30 @@ describe('outbox sync protocol', () => {
 
     await expect(syncOutbox(outbox)).rejects.toThrow('offline');
     expect(await outbox.count()).toBe(1);
+  });
+
+  it('reports an error and records an attempt when the receiver accepts nothing', async () => {
+    vi.stubGlobal('chrome', chromeMock);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ accepted: [] }), { status: 200 })));
+    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items', receiverToken: 'secret' };
+    stored.stats = { lastSync: '2025-01-01T00:00:00.000Z' };
+    await outbox.put(item);
+
+    await expect(syncOutbox(outbox)).rejects.toThrow('Receiver accepted no outbox items');
+    expect(await outbox.count()).toBe(1);
+    expect((await outbox.list(1))[0]?.attempts).toBe(1);
+    expect((await outbox.list(1))[0]?.last_error).toBe('Receiver accepted no outbox items');
+    expect((stored.stats as { lastSync: string }).lastSync).toBe('2025-01-01T00:00:00.000Z');
+  });
+
+  it('reports an error for a 2xx response without a valid accepted array', async () => {
+    vi.stubGlobal('chrome', chromeMock);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })));
+    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items', receiverToken: 'secret' };
+    await outbox.put(item);
+
+    await expect(syncOutbox(outbox)).rejects.toThrow('Receiver accepted no outbox items');
+    expect((await outbox.list(1))[0]?.attempts).toBe(1);
+    expect(stored.stats).toBeUndefined();
   });
 });

@@ -55,6 +55,9 @@ export async function syncOutbox(outbox: Outbox): Promise<SyncResult> {
     if (!response.ok) throw new Error(`Receiver returned HTTP ${response.status}`);
     const payload: unknown = await response.json();
     const accepted = acceptedKeys(payload, new Set(keys));
+    if (accepted.length === 0) {
+      throw new Error('Receiver accepted no outbox items');
+    }
     await outbox.remove(accepted);
     await recordSync();
     return { accepted: accepted.length, pending: await outbox.count() };

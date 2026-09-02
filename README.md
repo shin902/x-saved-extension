@@ -28,7 +28,7 @@ The token is held by the extension service worker and popup only. It is never se
 - `/i/bookmarks` and `/<account>/likes` are observed with an isolated content script. Tweets are captured when their rendered article appears, so manual scrolling can be used for historical backfill.
 - A click on Like or Bookmark is captured only after the article changes from `like` to `unlike` or `bookmark` to `removeBookmark`.
 - Tweet data is normalized to `tweet_id`, `text`, `author`, `url`, `created_at`, and `kind` (`like` or `bookmark`).
-- The service worker stores `kind:tweet_id` in IndexedDB before upload. Duplicate observations are retained only once. Unlike / unbookmark never deletes history.
+- The service worker stores `kind:tweet_id` in a persistent IndexedDB seen set before upload, alongside the first outbox record in one transaction. ACKed outbox records can be removed without making later observations new again. Unlike / unbookmark never deletes history.
 - The popup reports captured/new/known/consecutive-known counts and pending outbox size. `Sync pending items` sends at most 50 records.
 
 For initial backfill, open the Likes or Bookmarks page, manually scroll at a normal pace, and stop when the popup's consecutive-known count indicates that previously seen records are being reached. The extension never auto-scrolls or auto-stops.
@@ -51,7 +51,7 @@ Configure the full POST endpoint (for example `http://host.tailnet.ts.net:8787/v
 }
 ```
 
-After the receiver commits its database transaction, it must return HTTP 2xx JSON with an `accepted` array containing the accepted outbox keys (for example `like:123`). An item not named in `accepted` is not removed. Network failures and rejected items remain in IndexedDB for a later retry. The receiver should independently merge by `tweet_id` and sticky Like / Bookmark flags.
+After the receiver commits its database transaction, it must return HTTP 2xx JSON with an `accepted` array containing the accepted outbox keys (for example `like:123`). For a non-empty batch, an empty or invalid `accepted` array is treated as a failed sync, recorded as an attempt, and leaves every item pending. An item not named in `accepted` is not removed. Network failures and rejected items remain in IndexedDB for a later retry. The receiver should independently merge by `tweet_id` and sticky Like / Bookmark flags.
 
 ## Security and privacy
 

@@ -3,7 +3,7 @@
   "name": "X Saved",
   "version": "0.1.0",
   "description": "Capture visible X likes and bookmarks without exporting browser credentials.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "permissions"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "service-worker.js" },
   "action": { "default_title": "X Saved", "default_popup": "popup.html" },

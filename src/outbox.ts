@@ -2,8 +2,9 @@ import type { OutboxRecord, SavedItem } from './types';
 import { dedupeKey } from './dom-parser';
 
 const DB_NAME = 'x-saved-extension';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'outbox';
+const SEEN_STORE = 'seen';
 
 function request<T>(value: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -31,8 +32,26 @@ export class Outbox {
         const open = this.indexedDB.open(DB_NAME, DB_VERSION);
         open.onupgradeneeded = () => {
           const database = open.result;
-          const store = database.createObjectStore(STORE, { keyPath: 'dedupe_key' });
-          store.createIndex('created_at', 'created_at', { unique: false });
+          const upgrade = open.transaction;
+          if (!database.objectStoreNames.contains(STORE)) {
+            const store = database.createObjectStore(STORE, { keyPath: 'dedupe_key' });
+            store.createIndex('created_at', 'created_at', { unique: false });
+          }
+          if (!database.objectStoreNames.contains(SEEN_STORE)) {
+            database.createObjectStore(SEEN_STORE, { keyPath: 'dedupe_key' });
+          }
+
+          // Preserve dedupe state for records already stored by version 1.
+          if (upgrade && upgrade.objectStoreNames.contains(STORE) && upgrade.objectStoreNames.contains(SEEN_STORE)) {
+            const outbox = upgrade.objectStore(STORE);
+            const seen = upgrade.objectStore(SEEN_STORE);
+            outbox.openCursor().onsuccess = (event) => {
+              const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+              if (!cursor) return;
+              seen.put({ dedupe_key: cursor.value.dedupe_key });
+              cursor.continue();
+            };
+          }
         };
         open.onsuccess = () => resolve(open.result);
         open.onerror = () => reject(open.error ?? new Error('Unable to open IndexedDB'));
@@ -43,16 +62,18 @@ export class Outbox {
 
   async put(item: SavedItem): Promise<'new' | 'known'> {
     const database = await this.open();
-    const transaction = database.transaction(STORE, 'readwrite');
+    const transaction = database.transaction([STORE, SEEN_STORE], 'readwrite');
     const done = transactionDone(transaction);
-    const store = transaction.objectStore(STORE);
+    const outbox = transaction.objectStore(STORE);
+    const seen = transaction.objectStore(SEEN_STORE);
     const key = dedupeKey(item);
-    const existing = await request<OutboxRecord | undefined>(store.get(key));
+    const existing = await request<{ dedupe_key: string } | undefined>(seen.get(key));
     if (existing) {
       await done;
       return 'known';
     }
-    store.add({
+    seen.add({ dedupe_key: key });
+    outbox.add({
       dedupe_key: key,
       item,
       created_at: new Date().toISOString(),
@@ -102,5 +123,15 @@ export class Outbox {
     const count = await request<number>(transaction.objectStore(STORE).count());
     await done;
     return count;
+  }
+
+  /** Clear all local state. Intended for tests and explicit local reset flows. */
+  async clear(): Promise<void> {
+    const database = await this.open();
+    const transaction = database.transaction([STORE, SEEN_STORE], 'readwrite');
+    const done = transactionDone(transaction);
+    transaction.objectStore(STORE).clear();
+    transaction.objectStore(SEEN_STORE).clear();
+    await done;
   }
 }

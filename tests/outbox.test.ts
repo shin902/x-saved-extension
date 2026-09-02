@@ -11,7 +11,28 @@ describe('IndexedDB outbox', () => {
   const outbox = new Outbox();
 
   afterEach(async () => {
-    await outbox.remove((await outbox.list(100)).map((record) => record.dedupe_key));
+    await outbox.clear();
+  });
+
+  it('migrates existing version 1 records into the persistent seen set', async () => {
+    const open = indexedDB.open('x-saved-extension', 1);
+    await new Promise<void>((resolve, reject) => {
+      open.onupgradeneeded = () => {
+        const store = open.result.createObjectStore('outbox', { keyPath: 'dedupe_key' });
+        store.createIndex('created_at', 'created_at', { unique: false });
+      };
+      open.onerror = () => reject(open.error ?? new Error('Unable to create legacy database'));
+      open.onsuccess = () => {
+        const database = open.result;
+        const transaction = database.transaction('outbox', 'readwrite');
+        transaction.objectStore('outbox').add({ dedupe_key: 'like:legacy', item: item('like', 'legacy'), created_at: '2025-01-01T00:00:00.000Z', attempts: 0 });
+        transaction.oncomplete = () => { database.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error ?? new Error('Unable to seed legacy database'));
+      };
+    });
+
+    expect(await outbox.put(item('like', 'legacy'))).toBe('known');
+    expect(await outbox.count()).toBe(1);
   });
 
   it('deduplicates by kind and tweet id while keeping like and bookmark separate', async () => {
@@ -28,5 +49,13 @@ describe('IndexedDB outbox', () => {
     expect((await outbox.list(100)).map((record) => record.dedupe_key)).toEqual(['like:2']);
     await outbox.markAttempt(['like:2'], 'offline');
     expect((await outbox.list(100))[0]?.last_error).toBe('offline');
+  });
+
+  it('keeps an item known after its acknowledged outbox record is removed', async () => {
+    await outbox.put(item('like', '3'));
+    await outbox.remove(['like:3']);
+
+    expect(await outbox.put(item('like', '3'))).toBe('known');
+    expect(await outbox.count()).toBe(0);
   });
 });
