@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>X Saved</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>X Saved</h1>
+    <dl class="stats">
+      <div><dt>Captured</dt><dd id="captured">0</dd></div>
+      <div><dt>New</dt><dd id="new">0</dd></div>
+      <div><dt>Known</dt><dd id="known">0</dd></div>
+      <div><dt>Consecutive known</dt><dd id="consecutive-known">0</dd></div>
+      <div><dt>Pending upload</dt><dd id="pending">0</dd></div>
+      <div><dt>Last sync</dt><dd id="last-sync">Never</dd></div>
+    </dl>
+    <p id="message" role="status"></p>
+    <form id="settings-form">
+      <label>Receiver URL <input id="receiver-url" type="url" placeholder="http://host.tailnet.ts.net:8787/v1/x-saved/items" required></label>
+      <label>Receiver token <input id="receiver-token" type="password" autocomplete="off" required></label>
+      <button type="submit">Save settings</button>
+    </form>
+    <button id="sync" type="button">Sync pending items</button>
+    <p class="hint">Only items accepted after the receiver commits them are removed from the outbox.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

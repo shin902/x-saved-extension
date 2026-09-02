@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "X Saved",
+  "version": "0.1.0",
+  "description": "Capture visible X likes and bookmarks without exporting browser credentials.",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "service-worker.js" },
+  "action": { "default_title": "X Saved", "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content-script.js"],
+      "world": "ISOLATED",
+      "run_at": "document_idle"
+    }
+  ]
+}

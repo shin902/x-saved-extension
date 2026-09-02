@@ -1,0 +1,59 @@
+import { dedupeKey } from './dom-parser';
+import { Outbox } from './outbox';
+import { getSettings, getStatus, recordCapture, saveSettings } from './storage';
+import { syncOutbox } from './sync';
+import type { ExtensionMessage, ExtensionSettings, SavedItem } from './types';
+
+const outbox = new Outbox();
+
+function isSavedItem(value: unknown): value is SavedItem {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<SavedItem>;
+  return typeof item.tweet_id === 'string' && /^[0-9]+$/.test(item.tweet_id) &&
+    typeof item.text === 'string' && item.text.length <= 100_000 &&
+    typeof item.author === 'string' && item.author.length <= 1_000 &&
+    typeof item.url === 'string' && /^https:\/\/x\.com\/[^\s]+\/status\/[0-9]+$/.test(item.url) &&
+    typeof item.created_at === 'string' && item.created_at.length <= 100 &&
+    (item.kind === 'like' || item.kind === 'bookmark');
+}
+
+function validSettings(settings: ExtensionSettings): ExtensionSettings {
+  const url = new URL(settings.receiverUrl);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Receiver URL must use http or https');
+  if (url.username || url.password) throw new Error('Receiver URL must not contain credentials');
+  if (!settings.receiverToken.trim()) throw new Error('Receiver token is required');
+  return { receiverUrl: url.toString(), receiverToken: settings.receiverToken };
+}
+
+async function handle(message: ExtensionMessage): Promise<unknown> {
+  switch (message.type) {
+    case 'CAPTURE_ITEM': {
+      if (!isSavedItem(message.item)) throw new Error('Invalid capture item');
+      // Reading the key here keeps the dedupe contract explicit; IndexedDB remains the authority.
+      const key = dedupeKey(message.item);
+      const result = await outbox.put(message.item);
+      const stats = await recordCapture(result === 'new');
+      return { stored: true, dedupe_key: key, result, stats };
+    }
+    case 'GET_STATUS':
+      return getStatus(outbox);
+    case 'GET_SETTINGS':
+      return getSettings();
+    case 'SET_SETTINGS': {
+      const settings = validSettings(message.settings);
+      await saveSettings(settings);
+      return { saved: true };
+    }
+    case 'SYNC':
+      return syncOutbox(outbox);
+    default:
+      throw new Error('Unknown message');
+  }
+}
+
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  void handle(message as ExtensionMessage)
+    .then((response) => sendResponse({ ok: true, ...((response ?? {}) as object) }))
+    .catch((error: unknown) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Request failed' }));
+  return true;
+});
