@@ -18,10 +18,10 @@ The unpacked extension is created in `dist/`.
 1. Run `npm run build`.
 2. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
 3. Select this repository's `dist/` directory.
-4. Open the extension popup and configure the complete receiver URL and bearer token.
+4. Open the extension popup and configure the complete receiver URL.
 5. Chrome asks for permission to connect to the configured receiver host. Grant it only for the Tailnet receiver.
 
-The token is held by the extension service worker and popup only. It is never sent to the X content script. Receiver URL and token are stored in `chrome.storage.local`; treat the local Chrome profile as sensitive.
+The receiver URL is stored in `chrome.storage.local`; treat the local Chrome profile as sensitive.
 
 ## Capture behavior
 
@@ -35,7 +35,7 @@ For initial backfill, open the Likes or Bookmarks page, manually scroll at a nor
 
 ## Receiver protocol
 
-Configure the full POST endpoint (for example `http://host.tailnet.ts.net:8787/v1/x-saved/items`). The extension sends:
+Configure the full POST endpoint (for example `http://host.tailnet.ts.net:8787/v1/x-saved/items`). The receiver relies on Tailscale/LAN network access rather than application authentication. The extension sends:
 
 ```json
 {
@@ -55,6 +55,6 @@ After the receiver commits its database transaction, it must return HTTP 2xx JSO
 
 ## Security and privacy
 
-The content script is `ISOLATED` by Chrome's default content-script execution world and uses DOM selectors only. There are no `host_permissions` for X network calls and no `fetch`/XHR interception. Optional broad HTTP(S) permission is requested only after the user enters a receiver host, to support Tailnet IPs and MagicDNS names; use a Tailnet-only URL and do not expose the receiver publicly. The extension sends only rendered tweet fields and the configured receiver credential to that receiver.
+The content script is `ISOLATED` by Chrome's default content-script execution world and uses DOM selectors only. There are no `host_permissions` for X network calls and no `fetch`/XHR interception. Optional broad HTTP(S) permission is requested only after the user enters a receiver host, to support Tailnet IPs and MagicDNS names; use a Tailnet-only URL and do not expose the receiver publicly. The extension sends only rendered tweet fields to that receiver.
 
 This is an MVP: X can change its DOM selectors, optimistic UI does not prove server-side success, and media enrichment/download is intentionally not included.

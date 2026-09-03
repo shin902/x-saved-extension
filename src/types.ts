@@ -19,7 +19,6 @@ export interface OutboxRecord {
 
 export interface ExtensionSettings {
   receiverUrl: string;
-  receiverToken: string;
 }
 
 export interface CaptureStats {

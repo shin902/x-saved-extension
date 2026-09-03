@@ -30,18 +30,21 @@ describe('outbox sync protocol', () => {
     vi.stubGlobal('chrome', chromeMock);
     vi.stubGlobal('crypto', { randomUUID: () => 'request-1' });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ accepted: ['like:7', 'like:missing'] }), { status: 200 })));
-    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items', receiverToken: 'secret' };
+    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items' };
     await outbox.put(item);
 
     await expect(syncOutbox(outbox)).resolves.toEqual({ accepted: 1, pending: 0 });
     expect(globalThis.fetch).toHaveBeenCalledOnce();
+    expect((vi.mocked(globalThis.fetch).mock.calls[0]?.[1] as RequestInit).headers).toEqual({
+      'Content-Type': 'application/json'
+    });
     expect(await outbox.count()).toBe(0);
   });
 
   it('keeps records when the receiver fails', async () => {
     vi.stubGlobal('chrome', chromeMock);
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items', receiverToken: 'secret' };
+    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items' };
     await outbox.put(item);
 
     await expect(syncOutbox(outbox)).rejects.toThrow('offline');
@@ -51,7 +54,7 @@ describe('outbox sync protocol', () => {
   it('reports an error and records an attempt when the receiver accepts nothing', async () => {
     vi.stubGlobal('chrome', chromeMock);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ accepted: [] }), { status: 200 })));
-    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items', receiverToken: 'secret' };
+    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items' };
     stored.stats = { lastSync: '2025-01-01T00:00:00.000Z' };
     await outbox.put(item);
 
@@ -65,7 +68,7 @@ describe('outbox sync protocol', () => {
   it('reports an error for a 2xx response without a valid accepted array', async () => {
     vi.stubGlobal('chrome', chromeMock);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })));
-    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items', receiverToken: 'secret' };
+    stored.settings = { receiverUrl: 'http://receiver.tailnet.ts.net/items' };
     await outbox.put(item);
 
     await expect(syncOutbox(outbox)).rejects.toThrow('Receiver accepted no outbox items');

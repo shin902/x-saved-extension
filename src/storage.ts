@@ -1,7 +1,7 @@
 import type { CaptureStats, ExtensionSettings, Status } from './types';
 import { Outbox } from './outbox';
 
-export const DEFAULT_SETTINGS: ExtensionSettings = { receiverUrl: '', receiverToken: '' };
+export const DEFAULT_SETTINGS: ExtensionSettings = { receiverUrl: '' };
 export const DEFAULT_STATS: CaptureStats = {
   captured: 0,
   new: 0,
@@ -33,11 +33,18 @@ function set(values: Record<string, unknown>): Promise<void> {
 
 export async function getSettings(): Promise<ExtensionSettings> {
   const values = await get({ settings: DEFAULT_SETTINGS });
-  return { ...DEFAULT_SETTINGS, ...(values as { settings?: Partial<ExtensionSettings> }).settings };
+  const settings = (values as { settings?: Partial<ExtensionSettings> }).settings;
+  const migratedSettings = { receiverUrl: settings?.receiverUrl ?? DEFAULT_SETTINGS.receiverUrl };
+
+  // Rewrite legacy settings so an old bearer token is not retained in storage.
+  if (settings && Object.keys(settings).some((key) => key !== 'receiverUrl')) {
+    await set({ settings: migratedSettings });
+  }
+  return migratedSettings;
 }
 
 export async function saveSettings(settings: ExtensionSettings): Promise<void> {
-  await set({ settings });
+  await set({ settings: { receiverUrl: settings.receiverUrl } });
 }
 
 export async function getStats(): Promise<CaptureStats> {

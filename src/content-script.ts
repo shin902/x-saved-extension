@@ -7,7 +7,7 @@ const inFlight = new Set<string>();
 function send(item: SavedItem, key: string): void {
   inFlight.add(key);
   const message: CaptureMessage = { type: 'CAPTURE_ITEM', item };
-  // The service worker owns persistence and credentials; this message contains item data only.
+  // The service worker owns persistence; this message contains item data only.
   chrome.runtime.sendMessage(message).then((response: { ok?: boolean; stored?: boolean } | undefined) => {
     inFlight.delete(key);
     if (response?.ok && response.stored) sent.add(key);

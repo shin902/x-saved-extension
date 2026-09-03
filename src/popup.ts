@@ -38,8 +38,7 @@ function permissionPattern(value: string): string {
 async function save(event: SubmitEvent): Promise<void> {
   event.preventDefault();
   const settings: ExtensionSettings = {
-    receiverUrl: $<HTMLInputElement>('receiver-url').value.trim(),
-    receiverToken: $<HTMLInputElement>('receiver-token').value
+    receiverUrl: $<HTMLInputElement>('receiver-url').value.trim()
   };
   const button = $('settings-form').querySelector<HTMLButtonElement>('button');
   if (button) button.disabled = true;
@@ -76,7 +75,6 @@ async function start(): Promise<void> {
   try {
     const settings = await message<ExtensionSettings & Response>({ type: 'GET_SETTINGS' });
     $<HTMLInputElement>('receiver-url').value = settings.receiverUrl;
-    $<HTMLInputElement>('receiver-token').value = settings.receiverToken;
     await refresh();
   } catch (error) {
     show(error instanceof Error ? error.message : 'Unable to load status');

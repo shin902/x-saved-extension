@@ -44,8 +44,7 @@ export async function syncOutbox(outbox: Outbox): Promise<SyncResult> {
     const response = await fetch(receiverUrl(settings.receiverUrl), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.receiverToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         items: records.map((record) => record.item),

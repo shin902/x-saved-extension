@@ -21,8 +21,7 @@ function validSettings(settings: ExtensionSettings): ExtensionSettings {
   const url = new URL(settings.receiverUrl);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Receiver URL must use http or https');
   if (url.username || url.password) throw new Error('Receiver URL must not contain credentials');
-  if (!settings.receiverToken.trim()) throw new Error('Receiver token is required');
-  return { receiverUrl: url.toString(), receiverToken: settings.receiverToken };
+  return { receiverUrl: url.toString() };
 }
 
 async function handle(message: ExtensionMessage): Promise<unknown> {
