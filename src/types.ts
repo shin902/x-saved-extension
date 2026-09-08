@@ -3,9 +3,9 @@ export type CaptureKind = 'like' | 'bookmark';
 export interface SavedItem {
   tweet_id: string;
   text: string;
-  author: string;
+  author?: string;
   url: string;
-  created_at: string;
+  created_at?: string;
   kind: CaptureKind;
 }
 
@@ -38,17 +38,18 @@ export interface CaptureMessage {
   item: SavedItem;
 }
 
-export interface SyncMessage { type: 'SYNC'; }
-export interface GetStatusMessage { type: 'GET_STATUS'; }
-export interface GetSettingsMessage { type: 'GET_SETTINGS'; }
+export interface SyncMessage {
+  type: 'SYNC';
+}
+export interface GetStatusMessage {
+  type: 'GET_STATUS';
+}
+export interface GetSettingsMessage {
+  type: 'GET_SETTINGS';
+}
 export interface SetSettingsMessage {
   type: 'SET_SETTINGS';
   settings: ExtensionSettings;
 }
 
-export type ExtensionMessage =
-  | CaptureMessage
-  | SyncMessage
-  | GetStatusMessage
-  | GetSettingsMessage
-  | SetSettingsMessage;
+export type ExtensionMessage = CaptureMessage | SyncMessage | GetStatusMessage | GetSettingsMessage | SetSettingsMessage;
