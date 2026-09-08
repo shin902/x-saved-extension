@@ -29,13 +29,16 @@ The receiver URL is stored in `chrome.storage.local`; treat the local Chrome pro
 - A click on Like or Bookmark is captured only after the article changes from `like` to `unlike` or `bookmark` to `removeBookmark`.
 - Tweet data is normalized to `tweet_id`, `text`, `author`, `url`, `created_at`, and `kind` (`like` or `bookmark`).
 - The service worker stores `kind:tweet_id` in a persistent IndexedDB seen set before upload, alongside the first outbox record in one transaction. ACKed outbox records can be removed without making later observations new again. Unlike / unbookmark never deletes history.
-- The popup reports captured/new/known/consecutive-known counts and pending outbox size. `Sync pending items` sends at most 50 records.
+- After IndexedDB commits, the service worker schedules best-effort automatic sync. Captures arriving within 500 ms are coalesced; continuous scrolling does not postpone the first batch indefinitely.
+- Automatic sync and the popup's `Sync pending items` share one in-flight operation. Pending records are drained in batches of at most 50; a partial ACK stops the drain and leaves unacknowledged records for a later trigger.
+- Requests time out after 15 seconds. Network/server failures leave records pending for a later capture or manual sync; there is no retry scheduler. Service-worker suspension may delay automatic delivery, but cannot erase pending records.
+- The popup reports captured/new/known/consecutive-known counts and pending outbox size.
 
 For initial backfill, open the Likes or Bookmarks page, manually scroll at a normal pace, and stop when the popup's consecutive-known count indicates that previously seen records are being reached. The extension never auto-scrolls or auto-stops.
 
 ## Receiver protocol
 
-Configure the full POST endpoint (for example `http://host.tailnet.ts.net:8787/v1/x-saved/items`). The receiver relies on Tailscale/LAN network access rather than application authentication. The extension sends:
+Configure the full HTTPS POST endpoint (for example `https://host.tailnet.ts.net:8443/v1/x-saved/items`). The [my-discord-agent receiver](https://github.com/shin902/my-discord-agent/blob/main/docs/x-saved.md#live-capture-setup) binds to localhost and is exposed only through Tailscale Serve. The Tailnet is the network boundary; no application bearer token is needed. Do not use Funnel or expose the receiver publicly. The extension sends:
 
 ```json
 {

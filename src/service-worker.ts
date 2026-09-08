@@ -1,20 +1,28 @@
 import { dedupeKey } from './dom-parser';
 import { Outbox } from './outbox';
 import { getSettings, getStatus, recordCapture, saveSettings } from './storage';
-import { syncOutbox } from './sync';
+import { SyncCoordinator } from './sync';
 import type { ExtensionMessage, ExtensionSettings, SavedItem } from './types';
 
 const outbox = new Outbox();
+const sync = new SyncCoordinator(outbox);
 
 function isSavedItem(value: unknown): value is SavedItem {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<SavedItem>;
-  return typeof item.tweet_id === 'string' && /^[0-9]+$/.test(item.tweet_id) &&
-    typeof item.text === 'string' && item.text.length <= 100_000 &&
-    typeof item.author === 'string' && item.author.length <= 1_000 &&
-    typeof item.url === 'string' && /^https:\/\/x\.com\/[^\s]+\/status\/[0-9]+$/.test(item.url) &&
-    typeof item.created_at === 'string' && item.created_at.length <= 100 &&
-    (item.kind === 'like' || item.kind === 'bookmark');
+  return (
+    typeof item.tweet_id === 'string' &&
+    /^[0-9]+$/.test(item.tweet_id) &&
+    typeof item.text === 'string' &&
+    item.text.length <= 100_000 &&
+    typeof item.author === 'string' &&
+    item.author.length <= 1_000 &&
+    typeof item.url === 'string' &&
+    /^https:\/\/x\.com\/[^\s]+\/status\/[0-9]+$/.test(item.url) &&
+    typeof item.created_at === 'string' &&
+    item.created_at.length <= 100 &&
+    (item.kind === 'like' || item.kind === 'bookmark')
+  );
 }
 
 function validSettings(settings: ExtensionSettings): ExtensionSettings {
@@ -31,6 +39,7 @@ async function handle(message: ExtensionMessage): Promise<unknown> {
       // Reading the key here keeps the dedupe contract explicit; IndexedDB remains the authority.
       const key = dedupeKey(message.item);
       const result = await outbox.put(message.item);
+      sync.schedule();
       const stats = await recordCapture(result === 'new');
       return { stored: true, dedupe_key: key, result, stats };
     }
@@ -44,7 +53,7 @@ async function handle(message: ExtensionMessage): Promise<unknown> {
       return { saved: true };
     }
     case 'SYNC':
-      return syncOutbox(outbox);
+      return sync.sync();
     default:
       throw new Error('Unknown message');
   }
@@ -53,6 +62,11 @@ async function handle(message: ExtensionMessage): Promise<unknown> {
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   void handle(message as ExtensionMessage)
     .then((response) => sendResponse({ ok: true, ...((response ?? {}) as object) }))
-    .catch((error: unknown) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Request failed' }));
+    .catch((error: unknown) =>
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : 'Request failed',
+      }),
+    );
   return true;
 });
