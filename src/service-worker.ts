@@ -1,29 +1,12 @@
 import { dedupeKey } from './dom-parser';
 import { Outbox } from './outbox';
+import { isSavedItem } from './saved-item';
 import { getSettings, getStatus, recordCapture, saveSettings } from './storage';
 import { SyncCoordinator } from './sync';
-import type { ExtensionMessage, ExtensionSettings, SavedItem } from './types';
+import type { ExtensionMessage, ExtensionSettings } from './types';
 
 const outbox = new Outbox();
 const sync = new SyncCoordinator(outbox);
-
-function isSavedItem(value: unknown): value is SavedItem {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as Partial<SavedItem>;
-  return (
-    typeof item.tweet_id === 'string' &&
-    /^[0-9]+$/.test(item.tweet_id) &&
-    typeof item.text === 'string' &&
-    item.text.length <= 100_000 &&
-    typeof item.author === 'string' &&
-    item.author.length <= 1_000 &&
-    typeof item.url === 'string' &&
-    /^https:\/\/x\.com\/[^\s]+\/status\/[0-9]+$/.test(item.url) &&
-    typeof item.created_at === 'string' &&
-    item.created_at.length <= 100 &&
-    (item.kind === 'like' || item.kind === 'bookmark')
-  );
-}
 
 function validSettings(settings: ExtensionSettings): ExtensionSettings {
   const url = new URL(settings.receiverUrl);
