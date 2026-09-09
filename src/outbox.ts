@@ -1,5 +1,4 @@
-import type { OutboxRecord, SavedItem, SavedMedia } from './types';
-import { enrichMedia, mediaSignature } from './media';
+import type { OutboxRecord, SavedItem } from './types';
 import { dedupeKey } from './dom-parser';
 
 const DB_NAME = 'x-saved-extension';
@@ -68,19 +67,17 @@ export class Outbox {
     const outbox = transaction.objectStore(STORE);
     const seen = transaction.objectStore(SEEN_STORE);
     const key = dedupeKey(item);
-    const existing = await request<{ dedupe_key: string; media?: SavedMedia[] } | undefined>(seen.get(key));
-    const media = enrichMedia(existing?.media, item.media);
-    if (existing && mediaSignature(existing.media) === mediaSignature(media)) {
+    const existing = await request<{ dedupe_key: string } | undefined>(seen.get(key));
+    if (existing) {
       await done;
       return 'known';
     }
-    // Optional media on v2 seen records needs no destructive schema migration.
-    seen.put({ dedupe_key: key, media });
-    outbox.put({
+    seen.add({ dedupe_key: key });
+    outbox.add({
       dedupe_key: key,
-      item: { ...item, ...(media.length ? { media } : {}) },
+      item,
       created_at: new Date().toISOString(),
-      attempts: 0,
+      attempts: 0
     } satisfies OutboxRecord);
     await done;
     return 'new';
@@ -96,18 +93,13 @@ export class Outbox {
     return records;
   }
 
-  async remove(sentRecords: OutboxRecord[]): Promise<void> {
-    if (sentRecords.length === 0) return;
+  async remove(keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
     const database = await this.open();
     const transaction = database.transaction(STORE, 'readwrite');
     const done = transactionDone(transaction);
     const store = transaction.objectStore(STORE);
-    for (const sent of sentRecords) {
-      const current = await request<OutboxRecord | undefined>(store.get(sent.dedupe_key));
-      // A stale ACK must not erase enrichment captured while POST was in flight.
-      if (current && mediaSignature(sent.item.media) === mediaSignature(current.item.media))
-        store.delete(sent.dedupe_key);
-    }
+    for (const key of keys) store.delete(key);
     await done;
   }
 
