@@ -1,5 +1,9 @@
 export type CaptureKind = 'like' | 'bookmark';
 
+export type SavedMedia =
+  | { kind: 'image'; position: number; source_url: string; alt_text?: string }
+  | { kind: 'video'; position: number };
+
 export interface SavedItem {
   tweet_id: string;
   text: string;
@@ -7,6 +11,7 @@ export interface SavedItem {
   url: string;
   created_at?: string;
   kind: CaptureKind;
+  media?: SavedMedia[];
 }
 
 export interface OutboxRecord {
@@ -52,4 +57,9 @@ export interface SetSettingsMessage {
   settings: ExtensionSettings;
 }
 
-export type ExtensionMessage = CaptureMessage | SyncMessage | GetStatusMessage | GetSettingsMessage | SetSettingsMessage;
+export type ExtensionMessage =
+  | CaptureMessage
+  | SyncMessage
+  | GetStatusMessage
+  | GetSettingsMessage
+  | SetSettingsMessage;

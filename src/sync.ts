@@ -10,7 +10,8 @@ export interface SyncResult {
 
 function receiverUrl(value: string): string {
   const parsed = new URL(value);
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Receiver URL must use http or https');
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+    throw new Error('Receiver URL must use http or https');
   if (parsed.username || parsed.password) throw new Error('Receiver URL must not contain credentials');
   return parsed.toString();
 }
@@ -58,7 +59,7 @@ async function syncBatch(outbox: Outbox): Promise<SyncResult & { complete: boole
     if (accepted.length === 0) {
       throw new Error('Receiver accepted no outbox items');
     }
-    await outbox.remove(accepted);
+    await outbox.remove(records.filter((record) => accepted.includes(record.dedupe_key)));
     await recordSync();
     return {
       accepted: accepted.length,
