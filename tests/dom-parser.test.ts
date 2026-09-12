@@ -25,6 +25,23 @@ describe('DOM tweet parser', () => {
     });
   });
 
+  it('prefers the timestamp link and canonicalizes bookmark media URLs', () => {
+    const root = article(`
+      <div data-testid="User-Name">@alice</div>
+      <a href="https://x.com/bob/status/456/photo/1">quoted media</a>
+      <a href="https://x.com/alice/status/123/photo/1">
+        <time datetime="2026-01-01T00:00:00Z"></time>
+      </a>
+    `);
+
+    expect(parseTweetArticle(root, 'bookmark')).toMatchObject({
+      tweet_id: '123',
+      url: 'https://x.com/alice/status/123',
+      author: '@alice',
+      kind: 'bookmark',
+    });
+  });
+
   it('recognizes history routes and selected action buttons', () => {
     expect(pageKind({ pathname: '/i/bookmarks' })).toBe('bookmark');
     expect(pageKind({ pathname: '/alice/likes' })).toBe('like');
