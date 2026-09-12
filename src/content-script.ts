@@ -5,16 +5,29 @@ const sent = new Set<string>();
 const inFlight = new Set<string>();
 
 function send(item: SavedItem, key: string): void {
+  const runtime = chrome.runtime;
+  // Reloading/updating the extension invalidates content scripts already attached
+  // to open tabs. They cannot reconnect; the tab must load the new script.
+  if (!runtime?.sendMessage) return;
+
   inFlight.add(key);
   const message: CaptureMessage = { type: 'CAPTURE_ITEM', item };
-  // The service worker owns persistence; this message contains item data only.
-  chrome.runtime.sendMessage(message).then((response: { ok?: boolean; stored?: boolean } | undefined) => {
+  try {
+    // The service worker owns persistence; this message contains item data only.
+    void runtime
+      .sendMessage(message)
+      .then((response: { ok?: boolean; stored?: boolean } | undefined) => {
+        inFlight.delete(key);
+        if (response?.ok && response.stored) sent.add(key);
+      })
+      .catch(() => {
+        inFlight.delete(key);
+        // Do not mark the item as sent: a later DOM observation can retry it.
+      });
+  } catch {
     inFlight.delete(key);
-    if (response?.ok && response.stored) sent.add(key);
-  }).catch(() => {
-    inFlight.delete(key);
-    // Do not mark the item as sent: a later DOM observation can retry it.
-  });
+    // A synchronous failure means this content-script context was invalidated.
+  }
 }
 
 function captureArticle(article: Element, kind: SavedItem['kind']): void {
