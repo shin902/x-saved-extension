@@ -8,7 +8,7 @@ const SavedItemSchema = z
     text: z.string().check(z.maxLength(100_000)),
     author: z.optional(z.string().check(z.regex(/^@?[A-Za-z0-9_]{1,15}$|^$/))),
     url: z.string().check(z.maxLength(200)),
-    created_at: z.optional(z.union([z.iso.datetime({ offset: true }), z.literal('')])),
+    created_at: z.optional(z.union([z.iso.datetime({ offset: true }), z.iso.datetime({ offset: true, precision: -1 }), z.literal('')])),
     kind: z.enum(['like', 'bookmark']),
   })
   .check(
