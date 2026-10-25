@@ -12,13 +12,17 @@
   "devDependencies": {
     "@types/chrome": "^0.0.270",
     "@types/node": "^26.4.1",
-    "esbuild": "^0.24.0",
+    "esbuild": "0.25.12",
     "fake-indexeddb": "^6.0.0",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vite": "6.4.4",
+    "vitest": "4.1.12"
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "4.6.6"
+  },
+  "overrides": {
+    "source-map-js": "1.2.2"
   }
 }
